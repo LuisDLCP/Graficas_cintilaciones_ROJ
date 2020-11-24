@@ -1,5 +1,6 @@
 #!/home/luis/anaconda3/bin/python3
 
+from matplotlib.dates import DateFormatter
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -125,9 +126,13 @@ def plot_s4(df, figure_name):
     # Identify the available PRNs
     prns = df["PRN"].str[0].unique() # extract the first character of each cell 
     
-    # Get current UTC date
-    fecha = datetime.datetime.utcnow()
-    fecha = fecha.strftime("%Y/%m/%d")
+    # Get file UTC date
+    fecha = figure_name[5:] # e.g. 200926
+    fecha2 = datetime.datetime.strptime(fecha, "%y%m%d")
+    fecha3 = datetime.datetime.strftime(fecha2,"%Y/%m/%d")
+
+    fecha2_tomorrow = fecha2 + pd.DateOffset(days=1)
+    fecha2_tomorrow = fecha2_tomorrow.to_pydatetime()
 
     # Create directory for output files
     new_directory = output_files_path + figure_name + "/"
@@ -153,11 +158,20 @@ def plot_s4(df, figure_name):
             first = 0 # first graph 
             last = len(ax) - 1 # last graph
             
-            df3.groupby("PRN")["S4_sig"+str(sig)].plot(ax=ax[i], style='o-')
+            # Plot data by prn and s4_sig
+            prn_values = df3["PRN"].unique().tolist()
+            prn_values.sort(key=lambda x: int(x[1:]))
+
+            for value in prn_values:
+                mask = df3["PRN"] == value
+                df4 = df3[mask]["S4_sig" + str(sig)]
+                ax[i].plot(df4.index, df4.values, '.', label= value)            
+            
+            #df3.groupby("PRN")["S4_sig"+str(sig)].plot(ax=ax[i], style='.')
 
             if i == first:
                 ax[i].set_title("Jicamarca", fontsize=20, fontweight='bold')
-                ax[i].set_title(fecha, loc="left", fontsize=14, style='normal', name='Ubuntu')
+                ax[i].set_title(fecha3, loc="left", fontsize=14, style='normal', name='Ubuntu')
 
             ax[i].set_title(get_sig_name(prn, sig) + f" | {get_prn_name(prn)}", loc="right",
                             fontsize=14, name = 'Ubuntu')
@@ -168,6 +182,10 @@ def plot_s4(df, figure_name):
             else:
                 ax[i].set_xlabel("", fontsize=14, weight='bold', color='gray')    
 
+            # Set axis limits 
+            ax[i].set_xlim([fecha2, fecha2_tomorrow])
+            ax[i].set_ylim([0,1])
+            
             # Rectangle frame width 
             for axis in ['top','bottom','left','right']:
                 ax[i].spines[axis].set_linewidth(1.5)
@@ -177,6 +195,10 @@ def plot_s4(df, figure_name):
             ax[i].yaxis.set_tick_params(width=2, length=15, direction='inout')
             ax[i].tick_params(axis='x', which='both', labelsize=12)
             ax[i].tick_params(axis='y', labelsize=12)
+
+            myFmt = DateFormatter("%H:%M")
+            ax[i].xaxis.set_major_formatter(myFmt)
+            ax[i].xaxis.set_minor_formatter(myFmt)
 
             # Grid and legend 
             ax[i].grid(which='both', axis='both', ls=':')
@@ -188,7 +210,6 @@ def plot_s4(df, figure_name):
         
         # Save figure as pdf
         figure_name2 = figure_name + f"_s4_{get_prn_name(prn)}.pdf"
-        
         plt.savefig(new_directory + figure_name2, bbox_inches='tight')
 
     return "Plotted succesfully!"    
