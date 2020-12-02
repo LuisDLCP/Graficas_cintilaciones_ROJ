@@ -2,6 +2,7 @@
 Docs/
 Input_data/
 Output_data/
+src/.ipynb_checkpoints/
 
 # files
 *.pdf

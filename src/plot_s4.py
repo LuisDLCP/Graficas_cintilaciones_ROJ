@@ -1,6 +1,16 @@
 #!/home/luis/anaconda3/bin/python3
+#__________________________________
+#           PLOT S4
+#             v2.0
+#----------------------------------
+# This program makes some graphs of 
+# 's4' variable, for each frequency
+# and constellation.
+# Author: Luis D.
+# :)
 
-from matplotlib.dates import DateFormatter
+from matplotlib.dates import DateFormatter, HourLocator
+from matplotlib.ticker import AutoMinorLocator
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -23,24 +33,22 @@ def read_s4_file(input_file):
 
 # Extract s4 info, for each frequency and constellation
 def process_dataframe(df):
-    # Delete columns without s4 info
+    # Delete columns without s4, elevation and azimuth info
     for i in df.columns:
         if i>3:
             m = (i-4)%24
-            if m == 1: del df[i]
-            elif m == 2: del df[i]
-            elif m >= 9: del df[i]
+            if m >= 9: del df[i]
     
     # Reindex the columns 
     df.columns = np.arange(len(df.columns)) 
 
     # A new df is created and filled 
-    df2 = pd.DataFrame(columns=range(10))
+    df2 = pd.DataFrame(columns=range(12))
 
-    T = 7 # Period of dataset
+    T = 9 # Period of dataset
     for i in range(len(df)):
         for h in range(df.iloc[i,3]): # that cell contains the number of measurements 
-            m = df.iloc[i,[0,1,2,4+T*h,5+T*h,6+T*h,7+T*h,8+T*h,9+T*h,10+T*h]]
+            m = df.iloc[i, [0, 1, 2, 4+T*h, 5+T*h, 6+T*h, 7+T*h, 8+T*h, 9+T*h, 10+T*h, 11+T*h, 12+T*h]]
             m.index = range(len(m))
             df2 = df2.append(m)
 
@@ -52,10 +60,10 @@ def process_dataframe(df):
 
     # Change datatype: str -> float
     for i in range(6):
-        df2[4+i] = df2[4+i].astype("str").str.strip().astype("float")
+        df2[6+i] = df2[6+i].astype("str").str.strip().astype("float")
 
     # Rename columns 
-    df2.columns = ["YY", "DOY", "SOD", "PRN", "S4_sig1", "S4_sig1_corr", "S4_sig2", 
+    df2.columns = ["YY", "DOY", "SOD", "PRN", "Azimuth", "Elevation", "S4_sig1", "S4_sig1_corr", "S4_sig2", 
                     "S4_sig2_corr", "S4_sig3", "S4_sig3_corr"]
 
     # Calculate the corrected S4
@@ -121,8 +129,8 @@ def process_dataframe(df):
 
     return df2
 
-# Plot s4 in function of each constellation and frequency
-def plot_s4(df, figure_name):
+# Plot s4 graph 01: all PRNs are in the same subplot
+def plot1_s4(df, figure_name):
     # Identify the available PRNs
     prns = df["PRN"].str[0].unique() # extract the first character of each cell 
     
@@ -135,7 +143,7 @@ def plot_s4(df, figure_name):
     fecha2_tomorrow = fecha2_tomorrow.to_pydatetime()
 
     # Create directory for output files
-    new_directory = output_files_path + figure_name + "/"
+    new_directory = output_files_path + figure_name + "/plot_1/"
     if not os.path.exists(new_directory):
         os.makedirs(new_directory)
 
@@ -145,7 +153,7 @@ def plot_s4(df, figure_name):
         df3 = df[mask]
         
         # Check no null columns 
-        sig_n = df3.columns[1:] # Extract only the columns which have freq info
+        sig_n = ['S4_sig1', 'S4_sig2', 'S4_sig3'] # Extract only the columns which have freq info
         n_subplots = 0
         for sig_i in sig_n:
             if df3[sig_i].isna().sum() < len(df3):
@@ -214,6 +222,190 @@ def plot_s4(df, figure_name):
 
     return "Plotted succesfully!"    
 
+# Plot s4 graph 02: there is a subplot for each PRN
+def plot2_s4(df, figure_name):
+    # Identify the available PRNs
+    prns = df["PRN"].str[0].unique() # extract the first character of each cell 
+    
+    # Get file UTC date
+    fecha = figure_name[5:] # e.g. 200926
+    fecha2 = datetime.datetime.strptime(fecha, "%y%m%d")
+    fecha3 = datetime.datetime.strftime(fecha2,"%Y/%m/%d")
+
+    fecha2_tomorrow = fecha2 + pd.DateOffset(days=1)
+    fecha2_tomorrow = fecha2_tomorrow.to_pydatetime()
+
+    # Create directory for output files
+    new_directory = output_files_path + figure_name + "/plot_2/"
+    if not os.path.exists(new_directory):
+        os.makedirs(new_directory)    
+
+    # Iterate for each prn constelation: e.g. G, E, S, R
+    for prn in prns:
+        mask = df["PRN"].str.contains(prn)
+        df3 = df[mask]
+        
+        # Check no null df columns 
+        sig_n = ['S4_sig1', 'S4_sig2', 'S4_sig3'] 
+        n_freqs = 0
+        for sig_i in sig_n:
+            if df3[sig_i].isna().sum() < len(df3):
+                n_freqs += 1
+        
+        # Iterate for each frequency: e.g. sig1, sig2, sig3
+        for freq_i in range(n_freqs):
+            sig = freq_i + 1
+            
+            # Plot data by prn and s4_sig
+            prn_values = df3["PRN"].unique().tolist()
+            prn_values.sort(key=lambda x: int(x[1:]))
+            i = 0 # prn_values index
+            
+            n_rows = (len(prn_values)+1)//2
+            n_cols = 2
+            fig, axs = plt.subplots(n_rows, n_cols, figsize=(7*n_cols,1*n_rows), sharex="col", 
+                                    sharey="row", gridspec_kw={'hspace': 0, 'wspace': 0})   
+            
+            # Iterate for each PRN element: e.g. G1, G2, etc.
+            for ax in axs.T.reshape(-1): # Plot up to down, rather than left to right 
+                # ax -> s4
+                # ax2 -> elevation
+                ax2 = ax.twinx()
+                
+                if i < len(prn_values):
+                    mask = df3["PRN"] == prn_values[i]
+                    df_aux = df3[mask]
+                    
+                    # Plot elevation info
+                    color2 = "orange"
+                    df5 = df_aux["Elevation"]
+                    ax2.plot(df5.index, df5.values, '.', color=color2, linewidth=0.1)
+                    
+                    # Plot s4 info
+                    color1 = "blue"
+                    df4 = df_aux["S4_sig" + str(sig)]
+                    ax.plot(df4.index, df4.values, '.', color=color1)
+                    
+                    # Annotate the prn number inside the subplot
+                    x_location = fecha2 + pd.Timedelta(minutes=30)
+                    ax2.text(x_location, 35, prn_values[i], fontsize=15, weight='roman')
+                    
+                # Set axis limits 
+                ax.set_xlim([fecha2, fecha2_tomorrow])
+                ax.set_ylim([0,1])
+                ax2.set_ylim([0,90])
+                
+                # Set ticks and tick labels 
+                # __ Set y axis format and labels; odds subplots only
+                len_half_ax = len(axs.T.reshape(-1))/2
+                
+                if i >= len_half_ax: # change only for the 2nd column
+                    j=i-len_half_ax
+                    
+                    # Set y labels only to even subplots
+                    ax.yaxis.set_minor_locator(AutoMinorLocator(4))
+                    ax.set_yticks([0,1])
+                    ax2.yaxis.set_minor_locator(AutoMinorLocator(4))
+                    ax2.set_yticks([0,90])
+                    
+                    if j%2 == 0: 
+                        ax.set_yticklabels([0,1])
+                        ax2.set_yticklabels([0,90])
+                    else:    
+                        ax.set_yticklabels(['',''])
+                        ax2.set_yticklabels(['',''])
+                        
+                    # Set yellow color to the right y axis
+                    for axis in ['top','bottom','left']:
+                        ax.spines[axis].set_linewidth(2)
+                        ax2.spines[axis].set_linewidth(2)
+                    
+                    ax.spines['right'].set_color(color2)
+                    ax.spines['right'].set_linewidth(2)
+                    ax2.spines['right'].set_color(color2)
+                    ax2.spines['right'].set_linewidth(2)
+                    ax2.tick_params(axis='y', which='both', colors=color2)
+                    
+                else: # apply some changes to the 1st column 
+                    # remove y tick labels for elevation 
+                    ax2.yaxis.set_minor_locator(AutoMinorLocator(4))
+                    ax2.set_yticks([0,90])
+                    ax2.set_yticklabels(['',''])
+                    
+                    # set linewidth to top, bottom and right borders of the subplot
+                    for axis in ['top','bottom','right']:
+                        ax.spines[axis].set_linewidth(2)
+                        ax2.spines[axis].set_linewidth(2)
+                    
+                    # Set blue color to the left y axis
+                    ax.spines['left'].set_color(color1)
+                    ax.spines['left'].set_linewidth(2)
+                    ax2.spines['left'].set_color(color1)
+                    ax2.spines['left'].set_linewidth(2)
+                    ax.tick_params(axis='y', which='both', colors=color1)
+                        
+                # set x axis format 
+                hours = HourLocator(interval = 2)
+                ax.xaxis.set_major_locator(hours) # ticks interval: 2h
+                ax.xaxis.set_minor_locator(AutoMinorLocator(2)) # minor tick division: 2
+                myFmt = DateFormatter("%H")
+                ax.xaxis.set_major_formatter(myFmt) # x format: hours 
+                
+                # set the ticks style 
+                ax.xaxis.set_tick_params(width=2, length=8, which='major', direction='out')
+                ax.xaxis.set_tick_params(width=1, length=4, which='minor', direction='out')
+                ax.yaxis.set_tick_params(width=2, length=15, which='major', direction='inout')
+                ax.yaxis.set_tick_params(width=1, length=4, which='minor', direction='out')
+                ax2.yaxis.set_tick_params(width=2, length=15, which='major', direction='inout')
+                ax2.yaxis.set_tick_params(width=1, length=4, which='minor', direction='out')
+                
+                # set the label ticks 
+                ax.tick_params(axis='x', which='major', labelsize=12)
+                ax.tick_params(axis='y', labelsize=12)
+                ax2.tick_params(axis='y', labelsize=12)
+                
+                # set grid
+                ax.grid(which='major', axis='both', ls=':', linewidth=1.2)
+                ax.grid(which='minor', axis='both', ls=':', alpha=0.5)
+                                        
+                # Set title and axis labels 
+                if prn != 'S':
+                    #labels
+                    fig.text(0.513, 0.08, 'Time UTC', ha='center', va='center', fontsize=14)
+                    fig.text(0.09, 0.5, 'S4', ha='center', va='center', rotation='vertical', 
+                            fontsize=14, color='b')
+                    fig.text(0.94, 0.5, 'Elevation Angle', ha='center', va='center', rotation=-90,
+                            fontsize=14, color=color2)
+                    # title
+                    fig.text(0.513, 0.895, 'S4', ha='center', va='center', fontsize=17, weight='roman')
+                    fig.text(0.32, 0.895, 'Jicamarca', ha='center', va='center', fontsize=17, 
+                            weight='roman', color='r')
+                    fig.text(0.12, 0.895, fecha3, ha='left', va='center', fontsize=17, weight='roman')
+                    fig.text(0.9, 0.895, get_sig_name(prn, sig) + f" | {get_prn_name(prn)}", 
+                            ha='right', va='center', fontsize=17, weight='roman')
+                else:
+                    # labels
+                    fig.text(0.513, -0.1, 'Time UTC', ha='center', va='center', fontsize=14)
+                    fig.text(0.09, 0.5, 'S4', ha='center', va='center', rotation='vertical', 
+                            fontsize=14, color=color1)
+                    fig.text(0.94, 0.5, 'Elevation Angle', ha='center', va='center', rotation=-90, 
+                            fontsize=14, color=color2)
+                    # title 
+                    fig.text(0.513, 0.95, 'S4', ha='center', va='center', fontsize=17, weight='roman')
+                    fig.text(0.32, 0.95, 'Jicamarca', ha='center', va='center', fontsize=17, 
+                            weight='roman', color='r')
+                    fig.text(0.12, 0.95, fecha3, ha='left', va='center', fontsize=17, weight='roman')
+                    fig.text(0.9, 0.95, get_sig_name(prn, sig) + f" | {get_prn_name(prn)}", 
+                            ha='right', va='center', fontsize=17, weight='roman')
+                    
+                i += 1
+            
+            # Save figure as pdf
+            figure_name2 = figure_name + f"_s4_{get_prn_name(prn)}_{get_sig_name(prn, sig)}.pdf"
+            plt.savefig(new_directory + figure_name2, bbox_inches='tight')
+
+    return "Plotted succesfully!"
+
 # Auxiliar functions
 # Get the name for a given PRN code
 def get_prn_name(prn_code):
@@ -274,12 +466,13 @@ def main():
             # Plot and save
             file_name = file_i[len(input_files_path):]
             figure_name = file_name[:-3]    
-            status = plot_s4(df2, figure_name)
+            plot1_s4(df2, figure_name)
+            plot2_s4(df2, figure_name)
 
             # Move input files to a permanent directory
             os.rename(file_i, input_files_path_op+file_name)
 
-    return status
+    return "Ok"
 
 if __name__ == '__main__':
     main()
