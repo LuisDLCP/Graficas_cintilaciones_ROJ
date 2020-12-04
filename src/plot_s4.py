@@ -181,7 +181,7 @@ def plot1_s4(df, figure_name):
                 ax[i].set_title("Jicamarca", fontsize=20, fontweight='bold')
                 ax[i].set_title(fecha3, loc="left", fontsize=14, style='normal', name='Ubuntu')
 
-            ax[i].set_title(get_sig_name(prn, sig) + f" | {get_prn_name(prn)}", loc="right",
+            ax[i].set_title(get_sig_name(prn, sig)["name"] + f" | {get_prn_name(prn)}", loc="right",
                             fontsize=14, name = 'Ubuntu')
             ax[i].set_ylabel("S4", fontsize=14, weight='bold', color='gray')
             #
@@ -244,23 +244,31 @@ def plot2_s4(df, figure_name):
     for prn in prns:
         mask = df["PRN"].str.contains(prn)
         df3 = df[mask]
-        
-        # Check no null df columns 
-        sig_n = ['S4_sig1', 'S4_sig2', 'S4_sig3'] 
-        n_freqs = 0
-        for sig_i in sig_n:
-            if df3[sig_i].isna().sum() < len(df3):
-                n_freqs += 1
+
+        # Check no null columns in the frequencies
+        sig_n_aux = ['S4_sig1', 'S4_sig2', 'S4_sig3'] 
+        sig_n = []
+        for value in sig_n_aux:
+            if df3[value].isna().sum() < len(df3):
+                sig_n.append(value)
         
         # Iterate for each frequency: e.g. sig1, sig2, sig3
-        for freq_i in range(n_freqs):
-            sig = freq_i + 1
-            
-            # Plot data by prn and s4_sig
-            prn_values = df3["PRN"].unique().tolist()
-            prn_values.sort(key=lambda x: int(x[1:]))
+        for sig_i in sig_n:
+
+            # Select the available satellites: C1, C2, etc.
+            prn_values_aux = df3["PRN"].unique().tolist()
+            prn_values_aux.sort(key=lambda x: int(x[1:]))
             i = 0 # prn_values index
             
+            # Check no null columns in the satellites
+            prn_values = []
+            for value in prn_values_aux:
+                mask = df3["PRN"] == value
+                df_test = df3[mask]
+                if df_test[sig_i].isna().sum() < len(df_test): # when the column is not null 
+                    prn_values.append(value)
+
+            # Create the figure with the subplots 
             n_rows = (len(prn_values)+1)//2
             n_cols = 2
             fig, axs = plt.subplots(n_rows, n_cols, figsize=(7*n_cols,1*n_rows), sharex="col", 
@@ -283,7 +291,7 @@ def plot2_s4(df, figure_name):
                     
                     # Plot s4 info
                     color1 = "blue"
-                    df4 = df_aux["S4_sig" + str(sig)]
+                    df4 = df_aux[sig_i]
                     ax.plot(df4.index, df4.values, '.', color=color1)
                     
                     # Annotate the prn number inside the subplot
@@ -408,7 +416,7 @@ def plot2_s4(df, figure_name):
                 i += 1
             
             # Save figure as pdf
-            figure_name2 = figure_name + f"_s4_{get_prn_name(prn)}_{get_sig_name(prn, sig)}.pdf"
+            figure_name2 = figure_name + f"_s4_{get_prn_name(prn)}_{frequency_name}.pdf"
             plt.savefig(new_directory + figure_name2, bbox_inches='tight')
 
     return "Plotted succesfully!"
@@ -444,7 +452,7 @@ def get_sig_name(prn, sig):
         elif prn == 'I':
             return {"name":'B1', "value":"1176.45"}
         else: 
-            return "Insert a right code!"
+            return {"name": 'null', "value": "nan"}
     elif sig == 2:
         if prn == 'G':
             return {"name":'L2C', "value":"1227.60"}
@@ -459,7 +467,7 @@ def get_sig_name(prn, sig):
         elif prn == 'S':
             return {"name":'L5', "value":'1176.45'}
         else: 
-            return "Insert a right code!"
+            return {"name": 'null', "value": "nan"}
     elif sig == 3:
         if prn == 'G':
             return {"name":'L5', "value":'1176.45'}
@@ -470,9 +478,9 @@ def get_sig_name(prn, sig):
         elif prn == 'C':
             return {"name":'B3', "value":'1268.52'}
         else: 
-            return "Insert a right code!"
+            return {"name": 'null', "value": "nan"}
     else:
-        "Insert a right code!"
+        return {"name": 'null', "value": "nan"}
 
 # Main
 def main():
