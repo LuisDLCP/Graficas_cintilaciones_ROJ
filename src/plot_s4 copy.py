@@ -1,7 +1,7 @@
 #!/home/luis/anaconda3/bin/python3
 #__________________________________
 #           PLOT S4
-#             v3.0
+#             v2.0
 #----------------------------------
 # This program makes some graphs of 
 # 's4' variable, for each frequency
@@ -369,10 +369,6 @@ def plot2_s4(df, figure_name):
                 ax.grid(which='minor', axis='both', ls=':', alpha=0.5)
                                         
                 # Set title and axis labels 
-                aux = get_sig_name(prn, int(sig_i[-1]))
-                frequency_name = aux["name"]
-                frequency_value = aux["value"] + "MHz"
-                
                 if prn != 'S':
                     #labels
                     fig.text(0.513, 0.08, 'Time UTC', ha='center', va='center', fontsize=14)
@@ -385,10 +381,8 @@ def plot2_s4(df, figure_name):
                     fig.text(0.32, 0.895, 'Jicamarca', ha='center', va='center', fontsize=17, 
                             weight='roman', color='r')
                     fig.text(0.12, 0.895, fecha3, ha='left', va='center', fontsize=17, weight='roman')
-                    fig.text(0.9, 0.895, f"{frequency_name} | {get_prn_name(prn)}", 
+                    fig.text(0.9, 0.895, get_sig_name(prn, sig) + f" | {get_prn_name(prn)}", 
                             ha='right', va='center', fontsize=17, weight='roman')
-                    fig.text(0.72, 0.895, frequency_value, ha='right', va='center', fontsize=17, 
-                            weight='roman')    
                 else:
                     # labels
                     fig.text(0.513, -0.1, 'Time UTC', ha='center', va='center', fontsize=14)
@@ -401,10 +395,9 @@ def plot2_s4(df, figure_name):
                     fig.text(0.32, 0.95, 'Jicamarca', ha='center', va='center', fontsize=17, 
                             weight='roman', color='r')
                     fig.text(0.12, 0.95, fecha3, ha='left', va='center', fontsize=17, weight='roman')
-                    fig.text(0.9, 0.95, f"{frequency_name} | {get_prn_name(prn)}", ha='right', 
-                            va='center', fontsize=17, weight='roman')
-                    fig.text(0.72, 0.95, frequency_value, ha='right', va='center', fontsize=17, 
-                            weight='roman')
+                    fig.text(0.9, 0.95, get_sig_name(prn, sig) + f" | {get_prn_name(prn)}", 
+                            ha='right', va='center', fontsize=17, weight='roman')
+                    
                 i += 1
             
             # Save figure as pdf
@@ -429,46 +422,34 @@ def get_prn_name(prn_code):
 # Get the frequency name for a given PRN code and Freq code
 def get_sig_name(prn, sig):
     if sig == 1:
-        if prn == 'G':
-            return {"name":'L1CA', "value":"1575.42"}
-        elif prn == 'R':
-            return {"name":'L1CA', "value":"1602"} # change 
-        elif prn == 'S':
-            return {"name":'L1CA', "value":"1575.42"}
-        elif prn == 'J':
-            return {"name":'L1CA', "value":"1575.42"}
+        if prn == 'G' or prn == 'R' or prn == 'S' or prn == 'J':
+            return 'L1CA'
         elif prn == 'E':
-            return {"name":'L1BC', "value":"1575.42"}
+            return 'L1BC'
         elif prn == 'C':
-            return {"name":'B1', "value":"1575.42"}
+            return 'B1'
         elif prn == 'I':
-            return {"name":'B1', "value":"1176.45"}
+            return 'L5'
         else: 
             return "Insert a right code!"
     elif sig == 2:
-        if prn == 'G':
-            return {"name":'L2C', "value":"1227.60"}
-        elif prn == 'R':
-            return {"name":'L2C', "value":"1246"} # change 
-        elif prn == 'J':
-            return {"name":'L2C', "value":"1227.60"}
+        if prn == 'G' or prn == 'R' or prn == 'J':
+            return 'L2C'
         elif prn == 'E':
-            return {"name":'E5a', "value":'1176.45'}
+            return 'E5a'
         elif prn == 'C':
-            return {"name":'B2', "value":'1176.45'}
+            return 'B2'
         elif prn == 'S':
-            return {"name":'L5', "value":'1176.45'}
+            return 'L5'
         else: 
             return "Insert a right code!"
     elif sig == 3:
-        if prn == 'G':
-            return {"name":'L5', "value":'1176.45'}
-        elif prn == 'J':
-            return {"name":'L5', "value":'1176.45'}
+        if prn == 'G' or prn == 'J':
+            return 'L5'
         elif prn == 'E':
-            return {"name":'E5b', "value":'1207.14'}
+            return 'E5b'
         elif prn == 'C':
-            return {"name":'B3', "value":'1268.52'}
+            return 'B3'
         else: 
             return "Insert a right code!"
     else:
