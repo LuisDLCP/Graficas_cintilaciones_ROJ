@@ -129,6 +129,31 @@ def process_dataframe(df):
 
     return df2
 
+# Filter S4 data based on the angle and the S4 value
+def filter_dataframe(df):
+    # Aux function
+    def filter_elev_s4(row):
+        elev = row[0]
+        s4 = row[1]
+        threshold_s4 = 0.3
+        threshold_elev = 35 # Unit: º
+        
+        if elev < threshold_elev:
+            return [s4, np.nan, np.nan]
+        elif s4 < threshold_s4:
+            return [np.nan, s4, np.nan]
+        else:
+            return [np.nan, np.nan, s4]
+
+    # Create 3 additional columns per each S4_sigx column
+    for j in range(3):
+        j += 1
+        df_aux = df[["Elevation", f"S4_sig{j}"]].apply(filter_elev_s4, axis=1, result_type="expand")
+        df_aux.rename(columns = {0:f"S4_sig{j}_1", 1:f"S4_sig{j}_2", 2:f"S4_sig{j}_3"}, inplace=True)
+        df = pd.concat([df, df_aux], join='inner', axis=1)
+
+    return df    
+
 # Plot s4 graph 01: all PRNs are in the same subplot
 def plot1_s4(df, figure_name):
     # Identify the available PRNs
@@ -235,6 +260,14 @@ def plot2_s4(df, figure_name):
     fecha2_tomorrow = fecha2 + pd.DateOffset(days=1)
     fecha2_tomorrow = fecha2_tomorrow.to_pydatetime()
 
+    # Get UTC day range, for add a vertical span
+    fecha_morning_first = fecha2 + pd.DateOffset(hours=11) 
+    fecha_morning_first = fecha_morning_first.to_pydatetime()
+    
+    fecha_morning_last = fecha2 + pd.DateOffset(hours=23)
+    fecha_morning_last = fecha_morning_last.to_pydatetime()
+    fecha_morning_last
+
     # Create directory for output files
     new_directory = output_files_path + figure_name + "/plot_2/"
     if not os.path.exists(new_directory):
@@ -290,10 +323,16 @@ def plot2_s4(df, figure_name):
                     ax2.plot(df5.index, df5.values, '.', color=color2, linewidth=0.1)
                     
                     # Plot s4 info
-                    color1 = "blue"
-                    df4 = df_aux[sig_i]
-                    ax.plot(df4.index, df4.values, '.', color=color1)
-                    
+                    color1 = "blue" # This color is used in y axis labels, ticks and border  
+                    colors1 = ["lightsteelblue", "cornflowerblue", "navy"] # These colors are used for the plots 
+                    for k in range(3):
+                        idt = "_" + str(k+1)
+                        df4 = df_aux[sig_i + idt] # Select the filtered data: S4_sig1_1, S4_sig1_2, S4_sig1_3
+                        ax.plot(df4.index, df4.values, '.', color=colors1[k])
+                        # Plot the vertical frame 
+                        ax.set_facecolor(color="lightgrey")
+                        ax.axvspan(fecha_morning_first, fecha_morning_last, color="white")
+        
                     # Annotate the prn number inside the subplot
                     x_location = fecha2 + pd.Timedelta(minutes=30)
                     ax2.text(x_location, 35, prn_values[i], fontsize=15, weight='roman')
@@ -488,13 +527,14 @@ def main():
     if len(list_input_files) > 0:
         for file_i in list_input_files:
             df1 = read_s4_file(file_i)
-            df2 = process_dataframe(df1)
+            df2_1 = process_dataframe(df1)
+            df2_2 = filter_dataframe(df2_1)
             
             # Plot and save
             file_name = file_i[len(input_files_path):]
             figure_name = file_name[:-3]    
-            plot1_s4(df2, figure_name)
-            plot2_s4(df2, figure_name)
+            plot1_s4(df2_1, figure_name)
+            plot2_s4(df2_2, figure_name)
 
             # Move input files to a permanent directory
             os.rename(file_i, input_files_path_op+file_name)
