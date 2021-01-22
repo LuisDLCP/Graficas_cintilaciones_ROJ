@@ -320,7 +320,7 @@ def plot2_s4(df, figure_name):
                     # Plot elevation info
                     color2 = "orange"
                     df5 = df_aux["Elevation"]
-                    ax2.plot(df5.index, df5.values, '.', color=color2, linewidth=0.1)
+                    ax2.plot(df5.index, df5.values, '.', color=color2, markersize=1)
                     
                     # Plot s4 info
                     color1 = "blue" # This color is used in y axis labels, ticks and border  
@@ -328,7 +328,7 @@ def plot2_s4(df, figure_name):
                     for k in range(3):
                         idt = "_" + str(k+1)
                         df4 = df_aux[sig_i + idt] # Select the filtered data: S4_sig1_1, S4_sig1_2, S4_sig1_3
-                        ax.plot(df4.index, df4.values, '.', color=colors1[k])
+                        ax.plot(df4.index, df4.values, '.', color=colors1[k], markersize=2)
                         # Plot the vertical frame 
                         ax.set_facecolor(color="lightgrey")
                         ax.axvspan(fecha_morning_first, fecha_morning_last, color="white")
