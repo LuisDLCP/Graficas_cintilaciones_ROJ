@@ -9,7 +9,7 @@ This script generates s4 graphs for each constelation and frequency.
 -------------
 How it works?
     1) Place the INPUT files in the folder: /Input_data/Data_set/
-    2) Run the script plot_s4.py
+    2) Run the script plot_s4_2.py
     3) The OUTPUT files will be saved in the folder: /Output_files/station_name/
 
 -
