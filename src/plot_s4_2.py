@@ -13,6 +13,7 @@
 from matplotlib.dates import DateFormatter, HourLocator
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates 
 import pandas as pd
 import numpy as np
 import datetime
@@ -24,15 +25,16 @@ root_path = "/home/luis/Desktop/Proyects_Files/LISN/GPSs/Tareas/Graficas_cintila
 input_files_path = root_path + "Input_data/Data_set/"
 input_files_path_op = root_path + "Input_data/Data_procesada/"
 output_files_path = root_path + "Output_data/"
-file_s4 = "ljic_200806.s4"
+file_s4 = "ljic_200806.s4" # Test file 
 
 class ScintillationPlot():
     def __init__(self):
         self.pi = 3.14
     
     def read_s4_file(self, input_file):
-        self.df = pd.read_csv(input_file, header=None, sep="\t")
-        print("Done!")
+        self.input_file = input_file
+        self.df = pd.read_csv(self.input_file, header=None, sep="\t")
+        
         return self.df
     
     # Extract s4 info, for each frequency and constellation
@@ -132,8 +134,6 @@ class ScintillationPlot():
         df2.set_index("DateTime", inplace=True)
         self.df2 = df2.copy()
 
-        print("Done!")
-
         return self.df2
     
     # Filter S4 data based on the angle and the S4 value
@@ -159,7 +159,7 @@ class ScintillationPlot():
             df_aux.rename(columns = {0:f"S4_sig{j}_1", 1:f"S4_sig{j}_2", 2:f"S4_sig{j}_3"}, inplace=True)
             self.df2 = pd.concat([self.df2, df_aux], join='inner', axis=1)
 
-        print("Done!")
+        print("df ready to plot!")
         return self.df2    
 
     ####-Plot methods     
@@ -203,7 +203,7 @@ class ScintillationPlot():
         return df_final
 
     # Convert SBAS code to SVID (number only)
-    def convert2SVID(self, prn='G10'):
+    def _convert2SVID(self, prn='G10'):
         if prn[0] == "S":
             nn = int(prn[1:])
             if 20 <= nn <= 40:
@@ -274,16 +274,16 @@ class ScintillationPlot():
             return 'Incorrect PRN code!'
 
     # Convert GPS into SBAS frequencies    
-    def convert_GPS2SBAS_frequency(self, freq='S4_sig1'):
+    def _convert_GPS2SBAS_frequency(self, freq='S4_sig1'):
         if freq == 'S4_sig1': return freq
         elif freq == 'S4_sig3': return 'S4_sig2'
         
     # Append SBAS prns into another prns list 
-    def append_sbas_prns(self, const, freq, PRNs):
+    def _append_sbas_prns(self, const, freq, PRNs):
         const_sbas = 'S'
         if const == 'G':
             while freq != 'S4_sig2':
-                freq_sbas = self.convert_GPS2SBAS_frequency(freq)
+                freq_sbas = self._convert_GPS2SBAS_frequency(freq)
                 PRNs_SBAS = self.extract_prns(const_sbas, freq_sbas)
                 PRNs += PRNs_SBAS
                 break
@@ -298,49 +298,232 @@ class ScintillationPlot():
         else:
             return PRNs
         
+    # Change frequency for SBAS const
+    def _change_frequency(self, const='G', freq='S4_sig1'):
+        if const == 'G':
+            return self._convert_GPS2SBAS_frequency(freq)
+        elif const == 'E':
+            return freq
+        else:
+            return freq
+        
+    # Get figure name
+    def _figure_name(self):
+        file_name = self.input_file[len(input_files_path):]
+        figure_name = file_name[:-3]  
+        return figure_name
+
+    # Check no null column in the frequency column
+    def _check_noNull_values(self, const, freq):
+        mask = self.df2["PRN"].str.contains(const)
+        df_aux = self.df2[mask]
+        if df_aux[freq].isna().sum() < len(df_aux):
+            return True 
+        else:
+            return False
+
+    # Plot s4 and elevation info: there is a subplot for each PRN 
+    def plot1_s4(self, const='G', freq='S4_sig1', sbas=False):
+        if self._check_noNull_values(const, freq): 
+            # Get file UTC date
+            figure_name = self._figure_name()
+            fecha = figure_name[5:] # e.g. 200926
+            fecha2 = datetime.datetime.strptime(fecha, "%y%m%d")
+            fecha3 = datetime.datetime.strftime(fecha2,"%Y/%m/%d")
+
+            fecha2_tomorrow = fecha2 + pd.DateOffset(days=1)
+            fecha2_tomorrow = fecha2_tomorrow.to_pydatetime()
+
+            # Get UTC day range, to add a vertical strip
+            fecha_morning_first = fecha2 + pd.DateOffset(hours=11) 
+            fecha_morning_first = fecha_morning_first.to_pydatetime()
+            
+            fecha_morning_last = fecha2 + pd.DateOffset(hours=23)
+            fecha_morning_last = fecha_morning_last.to_pydatetime()
+
+            # Get the PRNs
+            PRNs = self.extract_prns(const, freq)
+            
+            # Include SBAS data if corresponds
+            if sbas: PRNs = self._append_sbas_prns(const, freq, PRNs)
+            
+            # Create the figure with the subplots 
+            n_rows = (len(PRNs)+1)//2
+            n_cols = 2
+            
+            fig, axs = plt.subplots(n_rows, n_cols, figsize=(7*n_cols,1*n_rows), sharex="col", sharey="row",
+                            gridspec_kw={'hspace': 0, 'wspace': 0})   
+            j = 0
+
+            for ax in axs.T.reshape(-1): # Plot up to down, rather than left to right 
+                # ax -> s4
+                # ax2 -> elevation
+                ax2 = ax.twinx()
+                
+                if j < len(PRNs):
+                    # Plot s4 info
+                    prn_value = PRNs[j]
+                    
+                    # -> Get the correct freq if sbas==True
+                    if sbas and prn_value[0]=='S': 
+                        freq_n = self._change_frequency(const, freq)
+                    else: freq_n = freq
+                        
+                    df3_s4 = self.get_s4(prn_value, freq_n)
+                    
+                    color1 = "blue" # This color is used in y axis labels, ticks and border  
+                    colors1 = ["lightsteelblue", "cornflowerblue", "navy"] # These colors are used for the plots
+
+                    for k in range(3):
+                        df4_s4 = df3_s4[k+1]
+
+                        ax.plot(df4_s4.index, df4_s4.values, '.', color=colors1[k], markersize=2)
+                        ax.set_facecolor(color="lightgrey")
+                        ax.axvspan(fecha_morning_first, fecha_morning_last, color="white") # strip morning/night
+                    
+                    # Plot elevation info
+                    df3_elev = self.get_elevation(PRNs[j], freq)
+                    
+                    color2 = "orange"
+                    ax2.plot(df3_elev.index, df3_elev.values, '.', color=color2, markersize=1)
+                    
+                    # Annotate the prn in the subplot
+                    x_location = fecha2 + pd.Timedelta(minutes=30)
+                    ax2.text(x_location, 35, self._convert2SVID(PRNs[j]), fontsize=15, weight='roman') # 0.375
+
+                # Set axis limits 
+                ax.set_xlim([fecha2, fecha2_tomorrow])
+                ax.set_ylim([0,1])
+                ax2.set_ylim([0,90])
+
+                # Set ticks and tick labels 
+                # Set y axis format, labels odds subplots only
+                len_half_ax = len(axs.T.reshape(-1))/2
+
+                if j >= len_half_ax: # change only for the 2nd column
+                    k=j-len_half_ax
+
+                    # Set y labels only to even subplots
+                    ax.yaxis.set_minor_locator(AutoMinorLocator(4))
+                    ax.set_yticks([0,1])
+                    ax2.yaxis.set_minor_locator(AutoMinorLocator(4))
+                    ax2.set_yticks([0,90])
+
+                    if k%2 == 0: 
+                        ax.set_yticklabels([0,1])
+                        ax2.set_yticklabels([0,90])
+                    else:    
+                        ax.set_yticklabels(['',''])
+                        ax2.set_yticklabels(['',''])
+
+                    # Set yellow color to the right y axis
+                    for axis in ['top','bottom','left']:
+                        ax.spines[axis].set_linewidth(2)
+                        ax2.spines[axis].set_linewidth(2)
+
+                    ax.spines['right'].set_color(color2)
+                    ax.spines['right'].set_linewidth(2)
+                    ax2.spines['right'].set_color(color2)
+                    ax2.spines['right'].set_linewidth(2)
+                    ax2.tick_params(axis='y', which='both', colors=color2)
+
+                else: # apply some changes to the 1st column 
+                    # remove y tick labels for elevation 
+                    ax2.yaxis.set_minor_locator(AutoMinorLocator(4))
+                    ax2.set_yticks([0,90])
+                    ax2.set_yticklabels(['',''])
+
+                    # set linewidth to top, bottom and right borders of the subplot
+                    for axis in ['top','bottom','right']:
+                        ax.spines[axis].set_linewidth(2)
+                        ax2.spines[axis].set_linewidth(2)
+
+                    # Set blue color to the left y axis
+                    ax.spines['left'].set_color(color1)
+                    ax.spines['left'].set_linewidth(2)
+                    ax2.spines['left'].set_color(color1)
+                    ax2.spines['left'].set_linewidth(2)
+                    ax.tick_params(axis='y', which='both', colors=color1)
+
+                # set x axis format 
+                hours = mdates.HourLocator(interval = 2)
+                ax.xaxis.set_major_locator(hours) # ticks interval: 2h
+                ax.xaxis.set_minor_locator(AutoMinorLocator(2)) # minor tick division: 2
+                myFmt = DateFormatter("%H")
+                ax.xaxis.set_major_formatter(myFmt) # x format: hours 
+                
+                # set the ticks style 
+                ax.xaxis.set_tick_params(width=2, length=8, which='major', direction='out')
+                ax.xaxis.set_tick_params(width=1, length=4, which='minor', direction='out')
+                ax.yaxis.set_tick_params(width=2, length=15, which='major', direction='inout')
+                ax.yaxis.set_tick_params(width=1, length=4, which='minor', direction='out')
+                ax2.yaxis.set_tick_params(width=2, length=15, which='major', direction='inout')
+                ax2.yaxis.set_tick_params(width=1, length=4, which='minor', direction='out')
+
+                # set the label ticks 
+                ax.tick_params(axis='x', which='major', labelsize=12)
+                ax.tick_params(axis='y', labelsize=12)
+                ax2.tick_params(axis='y', labelsize=12)
+                
+                # set grid
+                ax.grid(which='major', axis='both', ls=':', linewidth=1.2)
+                ax.grid(which='minor', axis='both', ls=':', alpha=0.5)
+                
+                j += 1
+
+            # Set title and axis labels 
+            aux = self.get_freq_name(const, int(freq[-1]))
+            frequency_name = aux["name"]
+            frequency_value = aux["value"] + "MHz"
+            # -> Labels
+            fig.text(0.513, 0.08, 'Time UTC', ha='center', va='center', fontsize=14)
+            fig.text(0.09, 0.5, 'S4', ha='center', va='center', rotation='vertical', fontsize=14, color='b')
+            fig.text(0.94, 0.5, 'Elevation Angle', ha='center', va='center', rotation=-90, fontsize=14, color=color2)
+            # -> Title
+            fig.text(0.513, 0.895, 'S4', ha='center', va='center', fontsize=17, weight='roman')
+            fig.text(0.32, 0.895, 'Jicamarca', ha='center', va='center', fontsize=17, weight='roman', color='r')
+            fig.text(0.12, 0.895, fecha3, ha='left', va='center', fontsize=17, weight='roman')
+            fig.text(0.9, 0.895, f"{frequency_name} | {self.get_const_name(const)}", ha='right', va='center', fontsize=17, weight='roman')
+            fig.text(0.72, 0.895, frequency_value, ha='right', va='center', fontsize=17, weight='roman')
+                
+            # Create directory for output files
+            new_directory = output_files_path + figure_name + "/plot_2/"
+            if not os.path.exists(new_directory):
+                os.makedirs(new_directory)    
+
+            # Save figure as pdf
+            figure_name2 = figure_name + f"_s4_{self.get_const_name(const)}_{frequency_name}.pdf"
+            plt.savefig(new_directory + figure_name2, bbox_inches='tight')
+            
+            print(f"Plotted successfully; for const: {const}, and freq: {freq}!")
+        else:
+            print(f"There is only Null data; for const: {const}, and freq: {freq}!") 
+
+        return 'Ok'
+
+def main():
+    # Specify the consts and freqs to plot 
+    const_list = ['G', 'E', 'S'] #  Constelations list  
+    freq_list = ['S4_sig1', 'S4_sig2', 'S4_sig3'] # Frecuencies list
+
+    list_input_files = glob.glob(input_files_path + "*.s4")
+    if len(list_input_files) > 0:
+        for file_i in list_input_files:
+            g = ScintillationPlot()
+            g.read_s4_file(file_i)
+            g.process_dataframe()
+            g.filter_dataframe() # Dataframe ready to plot 
+
+            # Plot 
+            for c in const_list:
+                for f in freq_list:         
+                    g.plot1_s4(const=c, freq=f, sbas=True)    
+
+            # Move input files to a permanent directory
+            file_name = file_i[len(input_files_path):]
+            os.rename(file_i, input_files_path_op+file_name)
     
+    return 'Ok'
 
-
-G1 = ScintillationPlot()
-G1.read_s4_file(input_files_path+file_s4)
-G1.process_dataframe()
-df1 = G1.filter_dataframe()
-#print(df1.head())
-#print(df1.columns)
-
-n_const = G1.extract_const()
-print(f"Available constellations: ")
-print(n_const)
-
-n_prns = G1.extract_prns(const='G')
-#print(f"Available PRNs: ")
-#print(n_prns)
-
-s4_data = G1.get_s4(freq='S4_sig2')
-s4_1 = s4_data[1].head()
-#print("The values of S4_sig1_1 are:")
-#print(s4_1)
-
-elevation = G1.get_elevation()
-#print("The elevation values are: ")
-#print(elevation.head())
-
-svid = G1.convert2SVID(prn="S45")
-print("The SVID is:")
-print(svid)
-
-freq_name = G1.get_freq_name()
-print("The freq name is:")
-print(freq_name["name"])
-
-const_name = G1.get_const_name('S')
-print("The const name is:")
-print(const_name)
-
-new_freq = G1.convert_GPS2SBAS_frequency('S4_sig1')
-print("The new frequency is: ")
-print(new_freq)
-
-prns_2 = G1.append_sbas_prns(const="G", freq='S4_sig1', PRNs=n_prns)
-print("The new prns list is:")
-print(prns_2)
+if __name__ == '__main__':
+    main()
