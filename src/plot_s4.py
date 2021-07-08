@@ -1,12 +1,20 @@
 #!/usr/bin/python3.6
 #__________________________________
 #           PLOT S4
-#             v4.0
+#             v5.0
 #----------------------------------
 # This program makes some graphs of 
 # 's4' variable, for each frequency
 # and constellation. SBAS data is 
 # included in GPS & GALILEO graphs. 
+# After plotting, graphs are saved in
+# an A4 pdf file.
+# Changes:
+# - dash marker ('-') instead of dot ('.')
+# - 36 subplots/page
+# - PRN names on the right-hand side
+# - s4 graphs above elevation graphs
+# - single s4 line's color (blue)
 # Author: Luis D.
 # :)
 
@@ -187,6 +195,15 @@ class ScintillationPlot():
         
         return prn_values
 
+    def all_prns(self, const='G'):
+        if const=='G':
+            list_prns = [f'G{i+1}' for i in range(32)]
+        elif const=='E':
+            list_prns = [f'E{i+1}' for i in range(36)]
+        else:
+            list_prns = []
+        return list_prns
+
     # Extract S4 data
     def get_s4(self, prn='G10', freq='S4_sig1'): # prn: str (e.g. 'C14') ; freq: str (e.g. 'S4_sig1')  
         mask = self.df2["PRN"] == prn
@@ -362,8 +379,9 @@ class ScintillationPlot():
             fecha_morning_last = fecha_morning_last.to_pydatetime()
 
             # Get the PRNs
-            PRNs = self.extract_prns(const, freq)
-            
+            #PRNs = self.extract_prns(const, freq)
+            PRNs = self.all_prns(const)
+
             # Include SBAS data if corresponds
             if sbas: PRNs = self._append_sbas_prns(const, freq, PRNs)
             
@@ -377,7 +395,7 @@ class ScintillationPlot():
             
             # Create the figure with the subplots 
             n_plots = len(PRNs) + len(PRNs)%2 # Number of subplots with data (even number) 
-            n_rows = 6 # Number of available rows p/ page 
+            n_rows = 18 #6 # Number of available rows p/ page 
             n_cols = 2 # Number of available columns p/ page 
             hratios = [1]*n_rows
 
@@ -395,99 +413,96 @@ class ScintillationPlot():
                     PRNs_section = PRNs
 
                 # Plot
-                fig, axs = plt.subplots(n_rows, n_cols, figsize=fig_size, sharex=False, sharey="row",
+                fig, axs = plt.subplots(n_rows, n_cols, figsize=fig_size, sharex=False, sharey=False,
                                 gridspec_kw={'hspace': 0, 'wspace': 0, 'height_ratios':hratios})   
                 j = 0
 
                 for ax in axs.reshape(-1): # Plot from left to right, rather than top to bottom 
                     if j < n_plots_left: # Plot
-                        # ax -> s4
-                        # ax2 -> elevation
+                        # ax -> elevation
+                        # ax2 -> s4
                         ax2 = ax.twinx()
                         
+                        # Change y axis positions
+                        ax.yaxis.set_label_position("right")
+                        ax.yaxis.tick_right()
+                        ax2.yaxis.set_label_position("left")
+                        ax2.yaxis.tick_left()                        
+
                         # Plot s4 & elevation data
                         if j < len(PRNs_section):
-                            # Plot s4 info
                             prn_value = PRNs_section[j]
                             
                             # -> Get the correct freq if sbas==True
                             if sbas and prn_value[0]=='S': 
                                 freq_n = self._change_frequency(const, freq)
                             else: freq_n = freq
-                                
+                            
+                            # Plot s4 info    
                             df3_s4 = self.get_s4(prn_value, freq_n)
                             
                             color1 = "blue" # This color is used in y axis labels, ticks and border  
-                            colors1 = ["lightsteelblue", "cornflowerblue", "navy"] # These colors are used for the plots
+                            colors1 = ['navy']*3 #["lightsteelblue", "cornflowerblue", "navy"] # These colors are used for the plots
 
                             for k in range(3):
                                 df4_s4 = df3_s4[k+1]
-
-                                ax.plot(df4_s4.index, df4_s4.values, '.', color=colors1[k], markersize=2)
+                                df4_s4 = df4_s4.sort_index().asfreq("T") # Resampling each minute
+                                
+                                ax2.plot(df4_s4.index, df4_s4.values, '-', color=colors1[k], markersize=2)
                                 ax.set_facecolor(color="lightgrey")
                                 ax.axvspan(fecha_morning_first, fecha_morning_last, color="white") # strip morning/night
                             
                             # Plot elevation info
                             df3_elev = self.get_elevation(prn_value, freq)
-                            
+                            df3_elev = df3_elev.sort_index().asfreq("T") # Resampling each minute
+
                             color2 = "orange"
-                            ax2.plot(df3_elev.index, df3_elev.values, '.', color=color2, markersize=1)
+                            ax.plot(df3_elev.index, df3_elev.values, '-', color=color2, markersize=1)
                             
                             # Annotate the prn in the subplot
-                            x_location = fecha2 + pd.Timedelta(minutes=30)
-                            ax2.text(x_location, 35, self._convert2SVID(prn_value), fontsize=15, weight='roman') # 0.375
+                            x_location = fecha2 + pd.Timedelta(hours=21, minutes=30)
+                            ax.text(x_location, 51, self._convert2SVID(prn_value), fontsize=12, weight='roman') # 0.375
 
                         # Set axis limits 
                         ax.set_xlim([fecha2, fecha2_tomorrow])
-                        ax.set_ylim([0,1])
-                        ax2.set_ylim([0,90])
+                        ax.set_ylim([0,90]) # elevation
+                        ax2.set_ylim([0,1]) # s4
 
-                        # Set ticks and tick labels 
-                        # -> Set y axis format, labels odds subplots only
-                        len_half_ax = len(axs.T.reshape(-1))/2
+                        ax.yaxis.set_minor_locator(AutoMinorLocator(4))
+                        ax.set_yticks([0,90])
+                        ax2.yaxis.set_minor_locator(AutoMinorLocator(4))
+                        ax2.set_yticks([0,1])
 
-                        if j%2 == 1: # change only for the 2nd column    
-                            # Set y labels only to even subplots
-                            ax.yaxis.set_minor_locator(AutoMinorLocator(4))
-                            ax.set_yticks([0,1])
-                            ax2.yaxis.set_minor_locator(AutoMinorLocator(4))
-                            ax2.set_yticks([0,90])
-
-                            if j%4 == 1: # subsequent subplot  
-                                ax.set_yticklabels([0,1])
-                                ax2.set_yticklabels([0,90])
-                            else:    
-                                ax.set_yticklabels(['',''])
+                        if j%2 == 0: # first column 
+                            ax.set_yticklabels(['',''])
+                            if j%4 == 0:
+                                ax2.set_yticklabels([0,1])
+                            else:
                                 ax2.set_yticklabels(['',''])
-
-                            # Set yellow color to the right y axis
-                            for axis in ['top','bottom','left']:
-                                ax.spines[axis].set_linewidth(2)
-                                ax2.spines[axis].set_linewidth(2)
-
-                            ax.spines['right'].set_color(color2)
-                            ax.spines['right'].set_linewidth(2)
-                            ax2.spines['right'].set_color(color2)
-                            ax2.spines['right'].set_linewidth(2)
-                            ax2.tick_params(axis='y', which='both', colors=color2)
-
-                        else: # apply some changes to the 1st column 
-                            # remove y tick labels for elevation 
-                            ax2.yaxis.set_minor_locator(AutoMinorLocator(4))
-                            ax2.set_yticks([0,90])
-                            ax2.set_yticklabels(['',''])
-
+                            
                             # set linewidth to top, bottom and right borders of the subplot
-                            for axis in ['top','bottom','right']:
+                            for axis in ['top','bottom','right','left']:
+                                ax.spines[axis].set_linewidth(2)
+                                ax2.spines[axis].set_linewidth(2)
+                            # set color for left spin
+                            ax2.spines['left'].set_color(color1)
+                            ax2.tick_params(axis='y', which='both', colors=color1) # tick and tick label color
+
+                        else: # second column 
+                            ax2.set_yticklabels(['',''])
+                            if j%4 == 1:
+                                ax.set_yticklabels([0,90])
+                            else:
+                                ax.set_yticklabels(['',''])
+                            
+                            # set linewidth to top, bottom and right borders of the subplot
+                            for axis in ['top','bottom','right','left']:
                                 ax.spines[axis].set_linewidth(2)
                                 ax2.spines[axis].set_linewidth(2)
 
-                            # Set blue color to the left y axis
-                            ax.spines['left'].set_color(color1)
-                            ax.spines['left'].set_linewidth(2)
-                            ax2.spines['left'].set_color(color1)
-                            ax2.spines['left'].set_linewidth(2)
-                            ax.tick_params(axis='y', which='both', colors=color1)
+                            # set color for right spin
+                            ax2.spines['right'].set_color(color2)
+                            ax.tick_params(axis='y', which='both', colors=color2) # tick and tick label color
 
                         # -> Set x axis format 
                         hours = mdates.HourLocator(interval = 2)
@@ -501,9 +516,9 @@ class ScintillationPlot():
                         ax.xaxis.set_tick_params(width=2, length=8, which='major', direction='out')
                         ax.xaxis.set_tick_params(width=1, length=4, which='minor', direction='out')
                         ax.yaxis.set_tick_params(width=2, length=15, which='major', direction='inout')
-                        ax.yaxis.set_tick_params(width=1, length=4, which='minor', direction='out')
+                        ax.yaxis.set_tick_params(width=1, length=8, which='minor', direction='inout')
                         ax2.yaxis.set_tick_params(width=2, length=15, which='major', direction='inout')
-                        ax2.yaxis.set_tick_params(width=1, length=4, which='minor', direction='out')
+                        ax2.yaxis.set_tick_params(width=1, length=8, which='minor', direction='inout')
 
                         # -> set the label ticks 
                         ax.tick_params(axis='x', which='major', labelsize=12)
@@ -538,7 +553,7 @@ class ScintillationPlot():
 
                         # -> Labels
                         if j == n_plots2-1: # x axis label, Subplot on Lower right
-                            fig.text(0, -0.5, 'Time UTC', ha='center', va='center', fontsize=14, transform=ax.transAxes) 
+                            fig.text(0, -1.35, 'Time UTC', ha='center', va='center', fontsize=14, transform=ax.transAxes) 
                         
                         aux_nrows = int(n_plots2/n_cols)
                         if j == aux_nrows-aux_nrows%2: # y axis label on the left
@@ -547,7 +562,7 @@ class ScintillationPlot():
                             
                         if j == (aux_nrows+(1-aux_nrows%2)): # y axis label on the right 
                             k = (aux_nrows%2)*0.5
-                            fig.text(1.1, 1-k, 'Elevation Angle($^o$)', ha='center', va='center', rotation=-90, fontsize=14, color=color2, transform=ax.transAxes)
+                            fig.text(1.12, 1-k, 'Elevation Angle($^o$)', ha='center', va='center', rotation=-90, fontsize=14, color=color2, transform=ax.transAxes)
 
                     else:
                         ax.axis('off')
@@ -603,5 +618,6 @@ def main():
     return 'Ok'
 
 if __name__ == '__main__':
+    print("STARTING ...")
     main()
     print("PLOTTING FINISHED! ----------")
