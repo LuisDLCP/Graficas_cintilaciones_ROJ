@@ -7,6 +7,9 @@
 # 's4' variable, for each frequency
 # and constellation. SBAS data is 
 # included in GPS & GALILEO graphs. 
+# It's used to plot custom graphs, for
+# instance, San Bartolome data with 
+# 10 rows. 
 # Author: Luis D.
 # :)
 
@@ -27,7 +30,8 @@ import os
 root_path = "/home/cesar/Desktop/luisd/scripts/Graficas_cintilaciones/"
 input_files_path = root_path + "Input_data/Data_set/"
 input_files_path_op = root_path + "Input_data/Data_procesada/"
-output_files_path = root_path + "Output_data/"
+output_files_path = root_path + "Output_data/Custom/"
+#output_files_path = root_path + "Output_data/"
 file_s4 = "ljic_200806.s4" # Test file 
 
 class ScintillationPlot():
@@ -377,7 +381,7 @@ class ScintillationPlot():
             
             # Create the figure with the subplots 
             n_plots = len(PRNs) + len(PRNs)%2 # Number of subplots with data (even number) 
-            n_rows = 6 # Number of available rows p/ page 
+            n_rows = 10 # Number of available rows p/ page 
             n_cols = 2 # Number of available columns p/ page 
             hratios = [1]*n_rows
 
@@ -418,7 +422,8 @@ class ScintillationPlot():
                             df3_s4 = self.get_s4(prn_value, freq_n)
                             
                             color1 = "blue" # This color is used in y axis labels, ticks and border  
-                            colors1 = ["lightsteelblue", "cornflowerblue", "navy"] # These colors are used for the plots
+                            colors1 = ["navy"]*3 # These colors are used for the plots
+                            #colors1 = ["lightsteelblue", "cornflowerblue", "navy"] # These colors are used for the plots
 
                             for k in range(3):
                                 df4_s4 = df3_s4[k+1]
@@ -538,7 +543,7 @@ class ScintillationPlot():
 
                         # -> Labels
                         if j == n_plots2-1: # x axis label, Subplot on Lower right
-                            fig.text(0, -0.5, 'Time UTC', ha='center', va='center', fontsize=14, transform=ax.transAxes) 
+                            fig.text(0, -0.75, 'Time UTC', ha='center', va='center', fontsize=14, transform=ax.transAxes) 
                         
                         aux_nrows = int(n_plots2/n_cols)
                         if j == aux_nrows-aux_nrows%2: # y axis label on the left
@@ -568,8 +573,7 @@ class ScintillationPlot():
 def main():
     # Specify the consts and freqs to plot 
     const_list = ['G', 'E'] #  Constelations list  
-    freq_list1 = ['S4_sig1', 'S4_sig2', 'S4_sig3'] # Frecuencies list GPS
-    freq_list2 = ['S4_sig1', 'S4_sig2'] # Frecuencies list GALILEO
+    freq_list = ['S4_sig1', 'S4_sig2', 'S4_sig3'] # Frecuencies list 
 
     list_input_files = glob.glob(input_files_path + "*.s4")
     if len(list_input_files) > 0:
@@ -586,15 +590,15 @@ def main():
 
             # -> Generate the plots 
             c = const_list[0] # GPS
-            for f in freq_list1:
+            for f in freq_list:
                 g.plot1_s4(const=c, freq=f, sbas=True, pdf=pdf)
             c = const_list[1] # GALILEO 
-            for f in freq_list2:
+            for f in freq_list:
                 g.plot1_s4(const=c, freq=f, sbas=False, pdf=pdf)
             pdf.close()
             
             # Create a copy of the plot file 
-            copy2(output_files_path + figure_name2, output_files_path+"ToUpload/")
+            #copy2(output_files_path + figure_name2, output_files_path+"ToUpload/")
 
             # Move input files to a permanent directory
             file_name = file_i[len(input_files_path):]
