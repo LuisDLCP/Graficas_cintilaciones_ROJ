@@ -614,6 +614,7 @@ def main():
             # Move input files to a permanent directory
             file_name = file_i[len(input_files_path):]
             os.rename(file_i, input_files_path_op+file_name)
+            os.system("gzip --force " + input_files_path_op+file_name)
     
     return 'Ok'
 
