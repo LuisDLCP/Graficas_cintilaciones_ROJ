@@ -27,9 +27,12 @@ import matplotlib.dates as mdates
 import pandas as pd
 import numpy as np
 import datetime
+import warnings 
 import math
 import glob
 import os 
+
+warnings.filterwarnings("ignore")
 
 # Declare variables
 root_path = "/home/cesar/Desktop/luisd/scripts/Graficas_cintilaciones/"
